@@ -1,0 +1,9 @@
+[submodule "libOAuth"]
+	path = libOAuth
+	url = https://github.com/leico/liboauth-xcode.git
+[submodule "libCurl"]
+	path = libCurl
+	url = https://github.com/leico/libcurl-xcode.git
+[submodule "picojson"]
+	path = picojson
+	url = https://github.com/kazuho/picojson.git
