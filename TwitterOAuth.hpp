@@ -384,14 +384,16 @@ inline const std :: string TwitterOAuth :: CurlUserAgent(void)                  
  * ============================= */
 inline void TwitterOAuth :: CurlDisconnect(void){
 
+
   curl_multi_remove_handle(_multihandle, _httphandle);
   curl_multi_cleanup      (_multihandle);
 
   //reset curl options
   curl_easy_reset(_httphandle);
   _multihandle = NULL;
-  //cleanup
+  //cleanup header
   curl_slist_free_all(_httpheader);
+  _httpheader = NULL;
 
 
 }
