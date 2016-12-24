@@ -1,0 +1,30 @@
+{
+  "DVTSourceControlWorkspaceBlueprintPrimaryRemoteRepositoryKey" : "20BB8D552FF04E8AEDF68A65BD596536FA3D75B2",
+  "DVTSourceControlWorkspaceBlueprintWorkingCopyRepositoryLocationsKey" : {
+
+  },
+  "DVTSourceControlWorkspaceBlueprintWorkingCopyStatesKey" : {
+    "1EA5B1EAE8DAAF121305ECD8E093F760D06C456B" : 9223372036854775807,
+    "20BB8D552FF04E8AEDF68A65BD596536FA3D75B2" : 9223372036854775807
+  },
+  "DVTSourceControlWorkspaceBlueprintIdentifierKey" : "59852425-68D2-4248-96A0-9AE8D1C2E8F4",
+  "DVTSourceControlWorkspaceBlueprintWorkingCopyPathsKey" : {
+    "1EA5B1EAE8DAAF121305ECD8E093F760D06C456B" : "",
+    "20BB8D552FF04E8AEDF68A65BD596536FA3D75B2" : "TwitterOAuth\/"
+  },
+  "DVTSourceControlWorkspaceBlueprintNameKey" : "TwitterOAuth",
+  "DVTSourceControlWorkspaceBlueprintVersion" : 204,
+  "DVTSourceControlWorkspaceBlueprintRelativePathToProjectKey" : "TwitterOAuth.xcodeproj",
+  "DVTSourceControlWorkspaceBlueprintRemoteRepositoriesKey" : [
+    {
+      "DVTSourceControlWorkspaceBlueprintRemoteRepositoryURLKey" : "https:\/\/github.com\/leico\/commandline_userstream.git",
+      "DVTSourceControlWorkspaceBlueprintRemoteRepositorySystemKey" : "com.apple.dt.Xcode.sourcecontrol.Git",
+      "DVTSourceControlWorkspaceBlueprintRemoteRepositoryIdentifierKey" : "1EA5B1EAE8DAAF121305ECD8E093F760D06C456B"
+    },
+    {
+      "DVTSourceControlWorkspaceBlueprintRemoteRepositoryURLKey" : "https:\/\/github.com\/leico\/libTwitterOAuth.git",
+      "DVTSourceControlWorkspaceBlueprintRemoteRepositorySystemKey" : "com.apple.dt.Xcode.sourcecontrol.Git",
+      "DVTSourceControlWorkspaceBlueprintRemoteRepositoryIdentifierKey" : "20BB8D552FF04E8AEDF68A65BD596536FA3D75B2"
+    }
+  ]
+}

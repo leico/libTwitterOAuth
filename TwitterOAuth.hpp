@@ -49,7 +49,9 @@ class TwitterOAuth{
 
 
   //Curl data
-  CURL *_curl;
+  struct curl_slist *_httpheader;
+  CURL              *_httphandle;
+  CURLM             *_multihandle;
 
   bool          _curl_verbose;
   std :: string _curl_agent;
@@ -154,8 +156,21 @@ class TwitterOAuth{
 
 
 
+
+
+  //Curl utility
+  void      CurlDisconnect   (void);
+  const int CurlConnectCount (void);
+  const int CurlReadMsgs     (std :: vector<std :: string>& msgs);
+ 
+
+
+
+
+
+
   //execute function
-  const std :: string SendRequest(void);
+  void StartSendRequest(void);
 
       //and related to generate/create/construct OAuth parameters
       const std :: string GenerateQuery(void);
@@ -200,7 +215,8 @@ inline TwitterOAuth ::  TwitterOAuth(void){
 
 inline TwitterOAuth :: ~TwitterOAuth(void){
 
-  curl_easy_cleanup(_curl);
+  CurlDisconnect();
+  curl_easy_cleanup(_httphandle);
   curl_global_cleanup();
 }
 
@@ -363,15 +379,74 @@ inline const std :: string TwitterOAuth :: CurlUserAgent(const std :: string& ag
 inline const std :: string TwitterOAuth :: CurlUserAgent(void)                      { return _curl_agent; }
 
 
+/* =============================
+ * Curl utility functions 
+ * ============================= */
+inline void TwitterOAuth :: CurlDisconnect(void){
+
+  curl_multi_remove_handle(_multihandle, _httphandle);
+  curl_multi_cleanup      (_multihandle);
+
+  //reset curl options
+  curl_easy_reset(_httphandle);
+  _multihandle = NULL;
+  //cleanup
+  curl_slist_free_all(_httpheader);
+
+
+}
+
+
+inline const int TwitterOAuth :: CurlConnectCount (void){
+
+  if(_multihandle == NULL) return 0;
+
+  int num;
+  curl_multi_perform(_multihandle, &num);
+  return num;
+}
+
+
+
+inline const int TwitterOAuth :: CurlReadMsgs(std :: vector<std :: string>& msgs){
+
+  msgs.clear();
+
+  if(_multihandle == NULL) return 0;
+
+  struct CURLMsg *m = NULL;
+
+  int count = 0;
+  while( (m = curl_multi_info_read(_multihandle, &count)) ){
+    
+    if(m -> msg == CURLMSG_DONE){
+      CURL *handle = m -> easy_handle;
+
+      //get status and messages
+      long http_code = 0;
+      curl_easy_getinfo(handle, CURLINFO_RESPONSE_CODE, &http_code);
+
+      //combine httpcode and result data
+      std :: stringstream ss;
+      ss << http_code << ":" << curl_easy_strerror( m -> data.result );
+      msgs.push_back( ss.str() );
+
+    }
+  }
+
+  return static_cast<const int>(msgs.size());
+}
 
 
 
 /* =============================
  * execute functions
  * ============================= */
-inline const std :: string TwitterOAuth :: SendRequest(void){
+inline void TwitterOAuth :: StartSendRequest(void){
 
   using Pair = StrMap :: value_type;
+
+  if(_multihandle != NULL) CurlDisconnect();
 
 
 
@@ -400,72 +475,69 @@ inline const std :: string TwitterOAuth :: SendRequest(void){
 
 
   //curl URL set
-  curl_easy_setopt(_curl, CURLOPT_URL, _restdata.at("url").c_str() );
+  curl_easy_setopt(_httphandle, CURLOPT_URL, _restdata.at("url").c_str() );
 
   //REST method POST mode
   if(RESTMethod() == "POST")
-    curl_easy_setopt(_curl, CURLOPT_POST, 1L);
+    curl_easy_setopt(_httphandle, CURLOPT_POST, 1L);
 
   //if you want show header etc, use CurlVerbose(true)
   if(CurlVerbose())
-    curl_easy_setopt(_curl, CURLOPT_VERBOSE, 1L);
+    curl_easy_setopt(_httphandle, CURLOPT_VERBOSE, 1L);
 
 
   //announce your app name
   if( ! CurlUserAgent().empty() )
-    curl_easy_setopt(_curl, CURLOPT_USERAGENT, CurlUserAgent().c_str() );
+    curl_easy_setopt(_httphandle, CURLOPT_USERAGENT, CurlUserAgent().c_str() );
 
 
   //construct httpheader and set header
-  struct curl_slist *httpheader = NULL;
-                     httpheader = curl_slist_append(httpheader, authorizationheader.c_str() );
-  curl_easy_setopt(_curl, CURLOPT_HTTPHEADER, httpheader);
+  _httpheader = curl_slist_append(_httpheader, authorizationheader.c_str() );
+  curl_easy_setopt(_httphandle, CURLOPT_HTTPHEADER, _httpheader);
 
 
   //if got any error, stop
-  curl_easy_setopt(_curl, CURLOPT_FAILONERROR, 1);
+  curl_easy_setopt(_httphandle, CURLOPT_FAILONERROR, 1);
 
   //transfer data compressed
-  curl_easy_setopt(_curl, CURLOPT_ENCODING, "gzip");
+  curl_easy_setopt(_httphandle, CURLOPT_ENCODING, "gzip");
 
 
   //responsefunc called when any response got
   if( isResponseCallback() )
-    curl_easy_setopt(_curl, CURLOPT_WRITEFUNCTION, _responsefunc);
+    curl_easy_setopt(_httphandle, CURLOPT_WRITEFUNCTION, _responsefunc);
 
   //and data to responsefunc passed pointer
   if( PassedResponseCallbackData() != NULL)
-    curl_easy_setopt(_curl, CURLOPT_WRITEDATA, _data_responsecallback);
+    curl_easy_setopt(_httphandle, CURLOPT_WRITEDATA, _data_responsecallback);
 
   //progressfunc called regularly when connecting
   if( isProgressCallback() ){
-    curl_easy_setopt(_curl, CURLOPT_NOPROGRESS,       0L);
-    curl_easy_setopt(_curl, CURLOPT_XFERINFOFUNCTION, _progressfunc);
+    curl_easy_setopt(_httphandle, CURLOPT_NOPROGRESS,       0L);
+    curl_easy_setopt(_httphandle, CURLOPT_XFERINFOFUNCTION, _progressfunc);
   }
 
   //data to progressfunc passed pointer
   if( PassedProgressCallbackData() != NULL)
-    curl_easy_setopt(_curl, CURLOPT_XFERINFODATA, _data_progresscallback );
+    curl_easy_setopt(_httphandle, CURLOPT_XFERINFODATA, _data_progresscallback );
+
+
+  //setting multi handles
+  _multihandle = curl_multi_init();
+
+  if(_multihandle == NULL){
+    std :: cout << "multihandle is NULL" << std :: endl;
+    exit(1);
+  }
+
+  //add twitterhandle to multi hundle 
+  curl_multi_add_handle(_multihandle, _httphandle);
+
+
+  int count = 0;
 
   //connect twitter
-  CURLcode curlstatus = curl_easy_perform(_curl);
-
-  //cleanup
-  curl_slist_free_all(httpheader);
-
-
-  //get status and messages
-  long http_code = 0;
-  curl_easy_getinfo(_curl, CURLINFO_RESPONSE_CODE, &http_code);
-
-  //output log
-  std :: stringstream ss;
-  ss << http_code << ":" << curl_easy_strerror( curlstatus );
-
-  //reset curl options
-  curl_easy_reset(_curl);
-
-  return ss.str();
+  curl_multi_perform(_multihandle, &count);
 
 }
 
@@ -518,8 +590,8 @@ inline const std :: string TwitterOAuth :: GenerateQuery(void){
       
       if(it != _oauthdata.begin()) ss << '&';
      
-      ss        << CurlToString( curl_easy_escape(_curl, (it -> first) .c_str(), 0) );
-      ss << '=' << CurlToString( curl_easy_escape(_curl, (it -> second).c_str(), 0) );
+      ss        << CurlToString( curl_easy_escape(_httphandle, (it -> first) .c_str(), 0) );
+      ss << '=' << CurlToString( curl_easy_escape(_httphandle, (it -> second).c_str(), 0) );
     }
 
     return ss.str();
@@ -534,9 +606,9 @@ inline const std :: string TwitterOAuth :: GenerateQuery(void){
 
 inline const std :: string TwitterOAuth :: ConstructBaseString(const std :: string& query){
   std :: stringstream ss;
-  ss        << CurlToString( curl_easy_escape(_curl, _restdata.at("RESTmethod").c_str(), 0) );
-  ss << '&' << CurlToString( curl_easy_escape(_curl, _restdata.at("url")       .c_str(), 0) );
-  ss << '&' << CurlToString( curl_easy_escape(_curl, query                     .c_str(), 0) ); 
+  ss        << CurlToString( curl_easy_escape(_httphandle, _restdata.at("RESTmethod").c_str(), 0) );
+  ss << '&' << CurlToString( curl_easy_escape(_httphandle, _restdata.at("url")       .c_str(), 0) );
+  ss << '&' << CurlToString( curl_easy_escape(_httphandle, query                     .c_str(), 0) ); 
 
   return ss.str();
 }
@@ -544,8 +616,8 @@ inline const std :: string TwitterOAuth :: ConstructBaseString(const std :: stri
 inline const std :: string TwitterOAuth :: ConstructKeyString (void){
 
     std :: stringstream ss;
-    ss        << CurlToString( curl_easy_escape(_curl, _signaturedata.at("consumer_secret").c_str(), 0) );
-    ss << '&' << CurlToString( curl_easy_escape(_curl, _signaturedata.at("token_secret")   .c_str(), 0) );
+    ss        << CurlToString( curl_easy_escape(_httphandle, _signaturedata.at("consumer_secret").c_str(), 0) );
+    ss << '&' << CurlToString( curl_easy_escape(_httphandle, _signaturedata.at("token_secret")   .c_str(), 0) );
 
     return ss.str();
 
@@ -554,7 +626,7 @@ inline const std :: string TwitterOAuth :: ConstructKeyString (void){
 inline const std :: string TwitterOAuth :: ConstructSignature(const std :: string& query, const std :: string& key){
 
     std :: string signature = CurlToString( oauth_sign_hmac_sha1(query.c_str(), key.c_str()) );
-                  signature = CurlToString( curl_easy_escape    (_curl, signature.c_str(), 0) );
+                  signature = CurlToString( curl_easy_escape    (_httphandle, signature.c_str(), 0) );
 
     return signature;
 }
@@ -598,12 +670,15 @@ inline void TwitterOAuth :: InitParam(void){
 
 
   curl_global_init(CURL_GLOBAL_ALL);
-  _curl = curl_easy_init();
+  _httphandle  = curl_easy_init();
+  _multihandle = NULL;
+  _httpheader  = NULL;
 
-  if(_curl == NULL){
-    std :: cout << "curl is NULL" << std :: endl;
+  if(_httphandle == NULL){
+    std :: cout << "httphandle is NULL" << std :: endl;
     exit(1);
   }
+
 
   CurlVerbose  (false);
   CurlUserAgent("");
